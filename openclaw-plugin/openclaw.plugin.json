@@ -1,0 +1,140 @@
+{
+  "id": "orion-instagram",
+  "name": "Orion Instagram",
+  "description": "Permission-scoped Instagram tools backed by the standalone Instagram MCP service.",
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "instagram_get_account",
+      "instagram_auth_status",
+      "instagram_get_capabilities",
+      "instagram_get_media",
+      "instagram_get_media_details",
+      "instagram_get_comments",
+      "instagram_get_comment",
+      "instagram_get_conversations",
+      "instagram_get_messages",
+      "instagram_get_insights",
+      "instagram_get_media_insights",
+      "instagram_has_contacted_account",
+      "instagram_has_commented_on_post",
+      "instagram_get_contacted_accounts",
+      "instagram_get_commented_posts",
+      "instagram_get_account_history",
+      "instagram_get_pending_actions",
+      "instagram_get_events",
+      "instagram_reply_to_comment",
+      "instagram_private_reply_to_comment",
+      "instagram_hide_comment",
+      "instagram_unhide_comment",
+      "instagram_delete_comment",
+      "instagram_reply_to_message",
+      "instagram_publish_image",
+      "instagram_publish_reel",
+      "instagram_publish_carousel"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "serviceUrl": {
+        "type": "string",
+        "format": "uri",
+        "default": "http://host.docker.internal:4840"
+      },
+      "agentTokens": {
+        "type": "object",
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 64
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "provider", "id"],
+              "properties": {
+                "source": { "type": "string", "enum": ["env", "file", "exec"] },
+                "provider": { "type": "string", "minLength": 1 },
+                "id": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        },
+        "default": {}
+      },
+      "defaultPermissions": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "enum": [
+            "account.read",
+            "media.read",
+            "comments.read",
+            "messages.read",
+            "insights.read",
+            "history.read",
+            "events.read",
+            "comments.write",
+            "messages.write",
+            "publishing.write"
+          ]
+        },
+        "default": [
+          "account.read",
+          "media.read",
+          "comments.read",
+          "history.read",
+          "events.read"
+        ]
+      },
+      "agentPermissions": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "account.read",
+              "media.read",
+              "comments.read",
+              "messages.read",
+              "insights.read",
+              "history.read",
+              "events.read",
+              "comments.write",
+              "messages.write",
+              "publishing.write"
+            ]
+          }
+        },
+        "default": {}
+      }
+    }
+  },
+  "configContracts": {
+    "secretInputs": {
+      "paths": [{ "path": "agentTokens.*", "expected": "string" }]
+    }
+  },
+  "uiHints": {
+    "agentTokens.*": {
+      "label": "Agent bridge token",
+      "sensitive": true
+    }
+  },
+  "toolMetadata": {
+    "instagram_reply_to_comment": { "optional": true },
+    "instagram_private_reply_to_comment": { "optional": true },
+    "instagram_reply_to_message": { "optional": true },
+    "instagram_publish_image": { "optional": true },
+    "instagram_publish_reel": { "optional": true },
+    "instagram_publish_carousel": { "optional": true }
+  }
+}

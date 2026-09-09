@@ -1,0 +1,29 @@
+{
+  "name": "@orion-os/instagram",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Orion and OpenClaw bridge for the standalone Instagram MCP service",
+  "engines": {
+    "node": ">=24.14.0"
+  },
+  "orion": {
+    "plugin": "./src/plugin/index.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/client.js && node --check src/plugin/index.js && npm test && npm --prefix openclaw-plugin test"
+  },
+  "dependencies": {
+    "express": "5.2.1",
+    "undici": "8.10.2"
+  },
+  "peerDependencies": {
+    "@orion-os/plugin-sdk": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@orion-os/plugin-sdk": {
+      "optional": true
+    }
+  }
+}
