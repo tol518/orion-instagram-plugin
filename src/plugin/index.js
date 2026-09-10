@@ -1,10 +1,13 @@
 import express from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createInstagramClient } from "../client.js";
 
 // Ten sequential carousel children plus the parent can each need four polling
 // intervals and bounded Meta read retries. Keep the connection above that limit.
 const ACTION_APPROVAL_TIMEOUT_MS = 100 * 60_000;
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const plugin = {
   id: "orion.instagram",
@@ -15,13 +18,12 @@ const plugin = {
   initialize(context) {
     const operatorToken = process.env.ORION_INSTAGRAM_OPERATOR_TOKEN;
     const apiToken = process.env.ORION_INSTAGRAM_API_TOKEN;
+    let client = null;
     if (!operatorToken || !apiToken) {
       context.logger.warn(
-        "[orion-instagram] operator credentials unset; plugin remains disconnected",
+        "[orion-instagram] operator credentials unset; dashboard works in disconnected mode",
       );
-      return;
-    }
-    if (
+    } else if (
       operatorToken.length < 64 ||
       apiToken.length < 64 ||
       operatorToken === apiToken
@@ -29,38 +31,126 @@ const plugin = {
       throw new Error(
         "Orion Instagram requires two different tokens of at least 64 characters",
       );
+    } else {
+      client = createInstagramClient({
+        serviceUrl:
+          process.env.ORION_INSTAGRAM_API_URL ?? "http://127.0.0.1:4840",
+        token: operatorToken,
+      });
     }
-    const client = createInstagramClient({
-      serviceUrl:
-        process.env.ORION_INSTAGRAM_API_URL ?? "http://127.0.0.1:4840",
-      token: operatorToken,
+    context.mountApi(createOperatorRouter(client, client ? apiToken : null));
+    context.mountAssets(path.join(rootDir, "ui", "dist"));
+    context.registerUi({
+      route: "instagram",
+      label: "Instagram",
+      description:
+        "Official Meta API status, approval queue, and Instagram write controls.",
+      icon: "plug",
+      elementName: "orion-instagram",
+      modulePath: "instagram.js",
     });
-    context.mountApi(createOperatorRouter(client, apiToken));
   },
 };
 
-export function createOperatorRouter(client, apiToken) {
+export function createOperatorRouter(client, apiToken = null) {
   const router = express.Router();
-  router.use(createOperatorAuthentication(apiToken));
-  router.get("/status", async (_request, response) =>
-    forward(response, () => client.request("/health")),
-  );
-  router.get("/pending", async (_request, response) =>
-    forward(response, () =>
-      client.request("/operator/pending", { operator: true }),
-    ),
-  );
-  router.post("/actions/:id/:decision", createActionDecisionHandler(client));
-  router.post("/kill-writes", async (_request, response) =>
-    forward(response, () =>
-      client.request("/operator/kill-writes", {
-        method: "POST",
-        body: {},
+  const authentication =
+    client && apiToken ? [createOperatorAuthentication(apiToken)] : [];
+  router.get("/overview", ...authentication, async (_request, response) => {
+    if (!client) {
+      return response.json({ ok: true, data: disconnectedOverview("not_configured") });
+    }
+    let health;
+    try {
+      health = await client.request("/health");
+    } catch {
+      return response.json({ ok: true, data: disconnectedOverview("unavailable") });
+    }
+    try {
+      const pendingResponse = await client.request("/operator/pending", {
         operator: true,
-      }),
-    ),
+      });
+      return response.json({
+        ok: true,
+        data: {
+          state: "connected",
+          connected: true,
+          health,
+          pending: Array.isArray(pendingResponse?.data) ? pendingResponse.data : [],
+          pending_available: true,
+        },
+      });
+    } catch {
+      return response.json({
+        ok: true,
+        data: {
+          state: "connected",
+          connected: true,
+          health,
+          pending: [],
+          pending_available: false,
+        },
+      });
+    }
+  });
+  router.get("/status", ...authentication, async (_request, response) => {
+    if (!client) {
+      return response.json({
+        ok: true,
+        data: disconnectedOverview("not_configured").health,
+      });
+    }
+    return forward(response, () => client.request("/health"));
+  });
+  router.get("/pending", ...authentication, async (_request, response) => {
+    if (!client) return response.json({ ok: true, data: { data: [] } });
+    return forward(response, () => client.request("/operator/pending", { operator: true }));
+  });
+  router.post(
+    "/actions/:id/:decision",
+    ...authentication,
+    requireConnection(client, createActionDecisionHandler),
+  );
+  router.post(
+    "/kill-writes",
+    ...authentication,
+    async (_request, response) =>
+      client
+        ? forward(response, () =>
+            client.request("/operator/kill-writes", {
+              method: "POST",
+              body: {},
+              operator: true,
+            }),
+          )
+        : unavailable(response),
   );
   return router;
+}
+
+function disconnectedOverview(state) {
+  return {
+    state,
+    connected: false,
+    health: { service: "instagram-mcp", writes_enabled: false, dry_run: true },
+    pending: [],
+    pending_available: true,
+  };
+}
+
+function requireConnection(client, handlerFactory) {
+  if (!client) return (_request, response) => unavailable(response);
+  return handlerFactory(client);
+}
+
+function unavailable(response) {
+  return response.status(503).json({
+    ok: false,
+    error: {
+      code: "INSTAGRAM_NOT_CONFIGURED",
+      message: "Connect the Instagram MCP service before using operator actions",
+    },
+  });
 }
 
 export function createActionDecisionHandler(client) {

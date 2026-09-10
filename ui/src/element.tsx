@@ -1,0 +1,39 @@
+import { createRoot, type Root } from "react-dom/client";
+import InstagramApp from "./instagram-app";
+import styles from "./styles.css?inline";
+
+class OrionInstagramElement extends HTMLElement {
+  static observedAttributes = ["api-base"];
+  #root: Root | null = null;
+  #mount: HTMLDivElement | null = null;
+
+  connectedCallback() {
+    if (!this.shadowRoot) {
+      const shadow = this.attachShadow({ mode: "open" });
+      const style = document.createElement("style");
+      style.textContent = styles;
+      this.#mount = document.createElement("div");
+      shadow.append(style, this.#mount);
+    }
+    if (this.#mount && !this.#root) this.#root = createRoot(this.#mount);
+    this.#render();
+  }
+
+  disconnectedCallback() {
+    this.#root?.unmount();
+    this.#root = null;
+  }
+
+  attributeChangedCallback() {
+    this.#render();
+  }
+
+  #render() {
+    const apiBase = this.getAttribute("api-base");
+    if (this.#root && apiBase) this.#root.render(<InstagramApp apiBase={apiBase} />);
+  }
+}
+
+if (!customElements.get("orion-instagram")) {
+  customElements.define("orion-instagram", OrionInstagramElement);
+}

@@ -8,11 +8,12 @@ This repository contains no Meta credentials, no Instagram API client, and no In
 
 ```text
 orion-instagram-plugin/
-├── src/plugin/          Orion operator API contribution
+├── src/plugin/          Orion operator API and dashboard contribution
+├── ui/                  Orion Instagram dashboard
 └── openclaw-plugin/     permission-scoped agent tools
 ```
 
-The Orion contribution proxies four operator functions from the private Instagram service: health, pending proposals, approve/reject, and emergency write shutdown. The OpenClaw plugin exposes the fixed Instagram MCP tool catalog to agents and binds each trusted OpenClaw `agentId` to its own service credential and permission set.
+The Orion contribution adds Instagram to the sidebar and provides status, setup guidance, pending approvals, approve/reject controls, and emergency write shutdown. It loads in a safe disconnected state before Meta credentials are available. The OpenClaw plugin exposes the fixed Instagram MCP tool catalog to agents and binds each trusted OpenClaw `agentId` to its own service credential and permission set.
 
 An approval can remain open while Meta processes a maximum-size carousel. Keep the Orion operator connection behind infrastructure that permits long-running requests.
 
@@ -22,6 +23,8 @@ Instagram extraction uses official Meta reads and authenticated webhook events t
 
 ```bash
 npm ci
+npm --prefix ui ci
+npm run build
 ```
 
 Add the project to Orion's existing plugin search path and provide the operator connection in Orion's private environment:
@@ -33,7 +36,9 @@ ORION_INSTAGRAM_OPERATOR_TOKEN=<64+ CHARACTER OPERATOR TOKEN>
 ORION_INSTAGRAM_API_TOKEN=<DIFFERENT 64+ CHARACTER ORION INGRESS TOKEN>
 ```
 
-The operator token must match `INSTAGRAM_OPERATOR_TOKEN` in `orion-instagram-mcp`. The ingress token protects Orion's plugin routes before the private operator token is attached upstream; every caller must send it as a bearer token. The two tokens must differ. Restart Orion after changing plugin paths or environment configuration.
+The operator token must match `INSTAGRAM_OPERATOR_TOKEN` in `orion-instagram-mcp`. The ingress token protects Orion's plugin routes before the private operator token is attached upstream; enter it in the dashboard unlock screen when connected. The browser keeps it only in memory. The two tokens must differ. Keep the service on an approved local host and restart Orion after changing plugin paths or environment configuration.
+
+When either token is absent, the sidebar and dashboard still load. Status stays disconnected, all writes stay disabled, and no request is sent to Meta.
 
 ## Install agent tools for OpenClaw
 
@@ -91,4 +96,4 @@ openclaw gateway status --deep --require-rpc
 npm run check
 ```
 
-The tests use mocked local service responses and require no Meta account.
+The tests and dashboard build require no Meta account.

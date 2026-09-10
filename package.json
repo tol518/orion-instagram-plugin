@@ -11,8 +11,9 @@
     "plugin": "./src/plugin/index.js"
   },
   "scripts": {
+    "build": "npm --prefix ui run build",
     "test": "node --test",
-    "check": "node --check src/client.js && node --check src/plugin/index.js && npm test && npm --prefix openclaw-plugin test"
+    "check": "node --check src/client.js && node --check src/plugin/index.js && npm test && npm --prefix openclaw-plugin test && npm run build"
   },
   "dependencies": {
     "express": "5.2.1",
